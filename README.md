@@ -2,6 +2,14 @@
 
 Local-first dictation for macOS using `ffmpeg` + `whisper.cpp` (`whisper-cli`), with optional LLM cleanup and tmux/desktop integrations.
 
+## Core USP
+
+Dictate is **tmux-first**.
+
+- Primary workflow: record in a tmux pane, let transcription/process run, and keep working in other panes/windows.
+- Inline dictation is supported, but it is a secondary convenience path.
+- Design priority is reliability and flow inside terminal/tmux environments over maximum raw transcription speed.
+
 ## What You Get
 
 - `bin/dictate`: main CLI
@@ -92,6 +100,7 @@ Useful install flags:
 
 ```bash
 dictate debug
+dictate            # tmux-first toggle mode
 dictate devices
 dictate inline
 dictate mode short
@@ -163,6 +172,10 @@ GitHub Actions runs the same checks on push and pull requests.
 ## Changelog
 
 `CHANGELOG.md` in this repo mirrors the detailed project history from local development, including the active TODO/next queue.
+
+## Roadmap
+
+See `ROADMAP.md` for current milestone direction (tmux-first hardening -> UX maturity -> integration platform -> stable release).
 
 ## Safety Notes
 
