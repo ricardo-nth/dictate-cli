@@ -23,6 +23,11 @@
     - `docs/RELEASE_CHECKLIST.md`
   - Added hardening regression coverage:
     - `tests/test_regression.sh` for install-channel detection and integration path-resolution guards.
+    - `tests/test_flow_parity.sh` for deterministic tmux/inline flow parity:
+      - tmux start/stop queue lifecycle + send-mode behavior (`enter` vs `codex`)
+      - inline autosend key paths (`ctrl_j`, `cmd_enter`)
+      - vocab-only cleanup parity in inline mode
+      - status/runtime parity for postprocess-no-key and mode/model env overrides
   - Integration hardening (Raycast/SwiftBar):
     - Broadened integration PATH fallbacks to include user-local + Homebrew + `/usr/local/bin`.
     - Raycast toggle now fails fast with explicit notifications when `dictate` or `tmux` is missing.
