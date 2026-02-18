@@ -1,22 +1,25 @@
 # dictate-cli
 
-Local dictation CLI for macOS using `ffmpeg` + `whisper.cpp`, with optional LLM post-processing.
+Local-first dictation for macOS using `ffmpeg` + `whisper.cpp` (`whisper-cli`), with optional LLM cleanup and tmux/desktop integrations.
 
-## What this repo provides
+## What You Get
 
-- `bin/dictate`: main CLI command
-- `bin/dictate-lib.sh`: shared helper library
+- `bin/dictate`: main CLI
+- `bin/dictate-lib.sh`: shared helper library used by CLI and integrations
 - `config/`: default config, modes, and vocab
-- `integrations/raycast/`: Raycast scripts for inline/toggle/cancel
+- `integrations/raycast/`: Raycast scripts (`inline`, `toggle`, `cancel`)
 - `integrations/dictate-status.0.2s.sh`: SwiftBar plugin
-- `install.sh`: installer for local setup
+- `assets/sounds/dictate/`: tiny sample WAV sound pack
+- `install.sh`: local installer
+- `tests/`: deterministic bash tests and install smoke tests
+- `.github/workflows/ci.yml`: CI for syntax + tests
 
 ## Requirements
 
 - macOS
 - `ffmpeg`
 - `whisper-cli` (from whisper.cpp)
-- `python3` (tomllib support)
+- `python3` (with `tomllib`, Python 3.11+ recommended)
 - Optional: `tmux`, Raycast, SwiftBar
 - Optional for LLM postprocess: `CEREBRAS_API_KEY`
 
@@ -28,13 +31,22 @@ cd dictate-cli
 ./install.sh
 ```
 
-Force refresh defaults (backs up existing config files first):
+Install behavior:
+
+- Does not overwrite existing `~/.config/dictate/*` defaults unless `--force` is used.
+- Installs Raycast scripts to `~/.config/dictate/integrations/raycast`.
+- Installs SwiftBar plugin to `~/.config/swiftbar/plugins/dictate-status.0.2s.sh`.
+- Installs sample sounds to `~/.local/share/sounds/dictate`.
+
+Useful install flags:
 
 ```bash
-./install.sh --force
+./install.sh --force         # refresh config defaults (creates backups)
+./install.sh --no-sounds     # skip sample sound install
+./install.sh --with-sounds   # explicit sound install
 ```
 
-## Quick start
+## Quick Start
 
 ```bash
 dictate debug
@@ -44,25 +56,71 @@ dictate mode short
 dictate postprocess on
 ```
 
-## Whisper models
+## Integrations
 
-Default lookup path is:
+### Raycast
+
+Import or point Raycast script commands to:
+
+- `~/.config/dictate/integrations/raycast/dictate-inline.sh`
+- `~/.config/dictate/integrations/raycast/dictate-toggle.sh`
+- `~/.config/dictate/integrations/raycast/dictate-cancel.sh`
+
+### SwiftBar
+
+Use plugin:
+
+- `~/.config/swiftbar/plugins/dictate-status.0.2s.sh`
+
+If needed, set `DICTATE_INSTALL_SWIFTBAR=0` to skip plugin install.
+
+## Sounds
+
+Bundled sample sounds live in `assets/sounds/dictate/` and install by default to:
 
 ```bash
-~/.local/share/whisper/models
+~/.local/share/sounds/dictate
 ```
 
-Place your `ggml-*.bin` model files there, then set one with:
+Default config references that location directly, so sounds work out of the box after install.
+
+## Development Workflow
+
+Use this repo as the source of truth and install to your local runtime path:
 
 ```bash
-dictate model base
+# from repo root
+./install.sh --force
 ```
 
-## Safety notes
+Then test your local command:
 
-- This repo excludes runtime history/cache directories.
-- No API keys are stored in repo config.
-- Existing `~/.config/dictate` files are not overwritten unless `--force` is used.
+```bash
+dictate debug
+dictate bench 10
+```
+
+## Testing and CI
+
+Run local checks:
+
+```bash
+./tests/ci.sh
+```
+
+This runs:
+
+- `bash -n` syntax checks across shipped shell scripts
+- `tests/test_lib.sh` (helper behavior)
+- `tests/test_install.sh` (installer smoke tests)
+
+GitHub Actions runs the same checks on push and pull requests.
+
+## Safety Notes
+
+- Runtime directories (`history`, caches, archives, temp logs) are not tracked.
+- API keys are not stored in this repository.
+- Existing local config is preserved unless `--force` is used.
 
 ## License
 

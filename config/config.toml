@@ -66,16 +66,16 @@ twitter = "𝕏"
 cancel = "🚫"
 
 [audio.sounds]
-cancel = "$SOUNDS_DIR/dictate/cancel.wav"
+cancel = "~/.local/share/sounds/dictate/cancel.wav"
 cancel_enabled = true
 enabled = true
-error = "$SOUNDS_DIR/dictate/error.wav"
+error = "~/.local/share/sounds/dictate/error.wav"
 error_enabled = true
-process = "$SOUNDS_DIR/dictate/process.wav"
+process = "~/.local/share/sounds/dictate/process.wav"
 process_enabled = true
-start = "$SOUNDS_DIR/dictate/start.wav"
+start = "~/.local/share/sounds/dictate/start.wav"
 start_enabled = true
-stop = "$SOUNDS_DIR/dictate/stop.wav"
+stop = "~/.local/share/sounds/dictate/stop.wav"
 stop_enabled = true
 
 [postprocess.mode_overrides.long]
