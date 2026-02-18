@@ -4,6 +4,15 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TMP_ROOT="$(mktemp -d)"
 trap 'rm -rf "$TMP_ROOT"' EXIT
+STUB_BIN="$TMP_ROOT/stub-bin"
+mkdir -p "$STUB_BIN"
+
+cat >"$STUB_BIN/osascript" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+exit 0
+EOF
+chmod +x "$STUB_BIN/osascript"
 
 assert_contains() {
   local name="$1"
@@ -72,12 +81,12 @@ assert_file_contains "swiftbar_missing_binary_notice" "$ROOT/integrations/dictat
 # --- Regression 4: script-level behavior for missing dictate binary is explicit. ---
 TOGGLE_HOME="$TMP_ROOT/home-toggle"
 mkdir -p "$TOGGLE_HOME"
-toggle_out="$(HOME="$TOGGLE_HOME" DICTATE_BIN="$TMP_ROOT/not-found-dictate" bash "$ROOT/integrations/raycast/dictate-toggle.sh" 2>&1 || true)"
+toggle_out="$(HOME="$TOGGLE_HOME" PATH="$STUB_BIN:/usr/bin:/bin" DICTATE_BIN="$TMP_ROOT/not-found-dictate" bash "$ROOT/integrations/raycast/dictate-toggle.sh" 2>&1 || true)"
 assert_contains "raycast_toggle_missing_binary_runtime" "$toggle_out" "dictate-toggle: Dictate binary not found."
 
 SWIFTBAR_HOME="$TMP_ROOT/home-swiftbar"
 mkdir -p "$SWIFTBAR_HOME"
-swiftbar_out="$(HOME="$SWIFTBAR_HOME" DICTATE_BIN="$TMP_ROOT/not-found-dictate" bash "$ROOT/integrations/dictate-status.0.2s.sh")"
+swiftbar_out="$(HOME="$SWIFTBAR_HOME" PATH="$STUB_BIN:/usr/bin:/bin" DICTATE_BIN="$TMP_ROOT/not-found-dictate" bash "$ROOT/integrations/dictate-status.0.2s.sh")"
 assert_contains "swiftbar_missing_binary_runtime" "$swiftbar_out" "Dictate binary not found"
 
 echo "Regression tests passed."
