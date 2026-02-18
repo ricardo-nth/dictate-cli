@@ -4,8 +4,8 @@ This project is now the single source of truth for Dictate development.
 
 ## Source of Truth
 
-- Primary development repo: `/Users/admin/Documents/Projects/dictate-cli`
-- Homebrew tap repo: `/Users/admin/Documents/Projects/homebrew-tap`
+- Primary development repo: `dictate-cli` (project workspace)
+- Homebrew tap repo: `homebrew-tap` (separate repo for formula updates)
 - Legacy bare repo (`~/.dictate.git`) is retired and archived; do not use it for active development.
 
 ## Development Workflow
