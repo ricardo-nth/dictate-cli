@@ -177,6 +177,12 @@ GitHub Actions runs the same checks on push and pull requests.
 
 See `ROADMAP.md` for current milestone direction (tmux-first hardening -> UX maturity -> integration platform -> stable release).
 
+## Contributing
+
+See `CONTRIBUTING.md` for branch, validation, and release expectations.
+
+Release operators should also follow `docs/RELEASE_CHECKLIST.md`.
+
 ## Safety Notes
 
 - Runtime directories (`history`, caches, archives, temp logs) are not tracked.

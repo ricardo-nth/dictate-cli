@@ -3,10 +3,24 @@
 ## Current working version
 
 - **Stable release**: `v0.3.0` (tagged on 2026-02-18)
+- **Next target**: `v0.4.0` (public hardening)
 - **Primary development branch**: `main` in `ricardo-nth/dictate-cli`
 - **Distribution channels**:
   - Homebrew (stable): `brew install ricardo-nth/tap/dictate-cli`
   - Bootstrap/local install (testing): `bootstrap.sh` or `./install.sh --force`
+
+## 2026-02-18
+
+- **Hardening (phase 1)**:
+  - Added stronger install/path diagnostics in `dictate debug` and `dictate doctor`:
+    - install channel detection (`homebrew` vs `local-user` vs `custom`)
+    - binary/lib/config/integration path sanity output
+    - dependency checks and model-directory health checks
+    - no hard failure in `dictate debug` when `ffmpeg` is missing
+  - Added contribution/release governance artifacts:
+    - `CONTRIBUTING.md`
+    - `.github/ISSUE_TEMPLATE/*`
+    - `docs/RELEASE_CHECKLIST.md`
 
 ## 2026-02-18
 
