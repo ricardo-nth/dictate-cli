@@ -733,15 +733,19 @@ debug() {
   local idx="${DICTATE_AUDIO_INDEX:-}"
   if [[ -n "$idx" ]]; then
     src="env:DICTATE_AUDIO_INDEX"
+  elif [[ -n "${CFG_AUDIO_DEVICE_INDEX:-}" ]]; then
+    idx="$CFG_AUDIO_DEVICE_INDEX"
+    src="config:audio.device_index"
   else
-    local detect_meta detect_src
-    detect_meta="$(detect_audio_index 2>/dev/null || true)"
-    IFS=$'\t' read -r idx detect_src _ <<<"$detect_meta"
-    if [[ -n "$idx" ]]; then
-      src="${detect_src:-detect:source(${CFG_AUDIO_SOURCE:-auto})}"
-    elif [[ -n "${CFG_AUDIO_DEVICE_INDEX:-}" ]]; then
-      idx="$CFG_AUDIO_DEVICE_INDEX"
-      src="config:audio.device_index"
+    if [[ -n "$ffmpeg_bin" && -n "$python_bin" ]]; then
+      local detect_meta detect_src
+      detect_meta="$(detect_audio_index 2>/dev/null || true)"
+      IFS=$'\t' read -r idx detect_src _ <<<"$detect_meta"
+      if [[ -n "$idx" ]]; then
+        src="${detect_src:-detect:source(${CFG_AUDIO_SOURCE:-auto})}"
+      fi
+    else
+      src="detect skipped (missing ffmpeg/python3)"
     fi
   fi
 
@@ -3365,15 +3369,19 @@ status() {
   audio_src="(none)"
   if [[ -n "$audio_idx" ]]; then
       audio_src="env:DICTATE_AUDIO_INDEX"
+  elif [[ -n "${CFG_AUDIO_DEVICE_INDEX:-}" ]]; then
+    audio_idx="${CFG_AUDIO_DEVICE_INDEX}"
+    audio_src="config:audio.device_index"
   else
-    local detect_meta detect_src
-    detect_meta="$(detect_audio_index 2>/dev/null || true)"
-    IFS=$'\t' read -r audio_idx detect_src _ <<<"$detect_meta"
-    if [[ -n "$audio_idx" ]]; then
-      audio_src="${detect_src:-detect:source(${audio_source_mode})}"
-    elif [[ -n "${CFG_AUDIO_DEVICE_INDEX:-}" ]]; then
-      audio_idx="${CFG_AUDIO_DEVICE_INDEX}"
-      audio_src="config:audio.device_index"
+    if command -v ffmpeg >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
+      local detect_meta detect_src
+      detect_meta="$(detect_audio_index 2>/dev/null || true)"
+      IFS=$'\t' read -r audio_idx detect_src _ <<<"$detect_meta"
+      if [[ -n "$audio_idx" ]]; then
+        audio_src="${detect_src:-detect:source(${audio_source_mode})}"
+      fi
+    else
+      audio_src="detect skipped (missing ffmpeg/python3)"
     fi
   fi
 
