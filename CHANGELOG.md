@@ -12,6 +12,7 @@
 ## 2026-02-18
 
 - **Release hardening follow-up (CI portability + local test hygiene)**:
+  - Installer safety: `--force` no longer overwrites existing sound files; use new `--replace-sounds` when explicit sound replacement is desired.
   - Fixed Linux CI/runtime compatibility for state-file mtime handling in `dictate status`/`dictate doctor` by adding portable `stat` fallbacks.
   - Ensured diagnostics paths (`dictate debug`/`dictate status`) degrade gracefully when `ffmpeg` is unavailable instead of hard-exiting.
   - Updated regression harness to stub `osascript` in missing-binary checks so local test runs do not emit real macOS notifications.

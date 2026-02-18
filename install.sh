@@ -3,15 +3,17 @@ set -euo pipefail
 
 FORCE=0
 INSTALL_SOUNDS="${DICTATE_INSTALL_SAMPLE_SOUNDS:-1}"
+REPLACE_SOUNDS="${DICTATE_REPLACE_SOUNDS:-0}"
 
 usage() {
   cat <<'EOF'
-Usage: ./install.sh [--force] [--with-sounds|--no-sounds]
+Usage: ./install.sh [--force] [--with-sounds|--no-sounds] [--replace-sounds]
 
 Options:
   --force        overwrite config defaults (backing up current files first)
   --with-sounds  install bundled sample sounds into ~/.local/share/sounds/dictate
   --no-sounds    skip sample sound installation
+  --replace-sounds  overwrite existing sound files with bundled samples
   -h, --help     show this help
 EOF
 }
@@ -26,6 +28,9 @@ while [[ $# -gt 0 ]]; do
       ;;
     --no-sounds)
       INSTALL_SOUNDS=0
+      ;;
+    --replace-sounds)
+      REPLACE_SOUNDS=1
       ;;
     -h|--help)
       usage
@@ -93,7 +98,7 @@ if [[ "$INSTALL_SOUNDS" == "1" && -d "$REPO_ROOT/assets/sounds/dictate" ]]; then
   for wav in "$REPO_ROOT"/assets/sounds/dictate/*.wav; do
     [[ -f "$wav" ]] || continue
     target="$SOUND_DIR/$(basename "$wav")"
-    if [[ "$FORCE" -eq 1 || ! -f "$target" ]]; then
+    if [[ "$REPLACE_SOUNDS" -eq 1 || ! -f "$target" ]]; then
       install -m 0644 "$wav" "$target"
     fi
   done

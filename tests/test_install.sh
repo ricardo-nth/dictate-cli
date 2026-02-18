@@ -50,6 +50,20 @@ if rg -q '# user-edit' "$HOME/.config/dictate/config.toml"; then
   exit 1
 fi
 
+# Force install should not overwrite existing custom sounds unless explicitly requested.
+printf '%s\n' 'custom-start-sound' > "$HOME/.local/share/sounds/dictate/start.wav"
+"$ROOT/install.sh" --force --with-sounds
+if ! rg -q 'custom-start-sound' "$HOME/.local/share/sounds/dictate/start.wav"; then
+  echo "Expected existing sounds to be preserved without --replace-sounds" >&2
+  exit 1
+fi
+
+"$ROOT/install.sh" --force --with-sounds --replace-sounds
+if rg -q 'custom-start-sound' "$HOME/.local/share/sounds/dictate/start.wav"; then
+  echo "Expected --replace-sounds to refresh sound files" >&2
+  exit 1
+fi
+
 shopt -s nullglob
 backups=("$HOME/.config/dictate/config.toml.bak."*)
 if (( ${#backups[@]} == 0 )); then

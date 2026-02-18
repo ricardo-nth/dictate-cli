@@ -89,9 +89,10 @@ Install behavior:
 Useful install flags:
 
 ```bash
-./install.sh --force         # refresh config defaults (creates backups)
-./install.sh --no-sounds     # skip sample sound install
-./install.sh --with-sounds   # explicit sound install
+./install.sh --force            # refresh config defaults (creates backups)
+./install.sh --no-sounds        # skip sample sound install
+./install.sh --with-sounds      # explicit sound install
+./install.sh --replace-sounds   # overwrite existing sound files with bundled samples
 ```
 
 `bootstrap.sh` downloads a repository archive from GitHub and runs `install.sh` from that archive.
@@ -133,7 +134,8 @@ Bundled sample sounds live in `assets/sounds/dictate/` and install by default to
 ~/.local/share/sounds/dictate
 ```
 
-Default config references that location directly, so sounds work out of the box after install.
+Existing files in that folder are preserved by default (including when using `--force`).
+Use `--replace-sounds` only when you explicitly want to overwrite local sound files.
 
 ## Development Workflow
 
