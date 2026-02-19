@@ -37,6 +37,10 @@
   - Added `dictate swiftbar [show|on|off|toggle]` to control SwiftBar integration at runtime (without reinstall/uninstall).
   - SwiftBar plugin now respects `integrations.swiftbar.enabled` and shows a compact OFF state with one-click re-enable.
   - `dictate doctor` now reports SwiftBar plugin presence together with enabled/disabled state.
+- **Bench matrix helper**:
+  - Added `dictate bench-matrix [N] [phrase_file]` to compare postprocess/vocab-clean combinations on fixed phrases.
+  - When `CEREBRAS_API_KEY` is set, bench-matrix also expands postprocess-on runs across configured LLM model candidates.
+  - Added regression coverage for bench-matrix usage validation and no-key smoke behavior.
 
 ## 2026-02-18
 
@@ -438,7 +442,7 @@ Attempted to speed up transcription by implementing a persistent daemon that kee
 
 - [x] Add stage timings and a lightweight `dictate bench` summary (record stop → transcribe → clean → postprocess → paste).
 - [ ] Tune whisper decode defaults (`threads` / `beam_size` / `best_of`) using benchmark data, not intuition.
-- [ ] Add a `dictate bench-matrix` command (`model × postprocess × vocab_clean`) to compare speed + output quality on a fixed phrase set.
+- [x] Add a `dictate bench-matrix` command (`model × postprocess × vocab_clean`) to compare speed + output quality on a fixed phrase set.
 - [x] Add explicit `short` vs `long` postprocess profiles (mode-specific LLM/token/chunk defaults).
 - [x] Improve vocab workflow: bulk import/batch add and easier correction review from recent history.
 - [ ] Add a lightweight session dashboard/TUI (Bubble Tea candidate) to summarize usage (sessions, words processed, postprocess/tokens, time saved trends) from recent history/bench data.

@@ -116,6 +116,7 @@ dictate postprocess on
 - `dictate vocab import <file>` now shows line-numbered previews for invalid entries (first 5).
 - `dictate vocab dedupe` now creates a timestamped backup before rewriting your vocab file.
 - `dictate vocab export <file>` writes a normalized/deduped vocab snapshot you can share or version.
+- `dictate bench-matrix [N] [phrase_file]` runs a quick matrix over postprocess/vocab toggles (and LLM models when API key is set) on fixed phrases.
 
 ## Troubleshooting
 
@@ -196,6 +197,7 @@ Then test your local command:
 ```bash
 dictate debug
 dictate bench 10
+dictate bench-matrix 1
 ```
 
 ## Testing and CI

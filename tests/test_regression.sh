@@ -220,4 +220,23 @@ assert_contains "vocab_dedupe_backup_line" "$dedupe_out" "Backup: "
 dedupe_backup="$(printf "%s\n" "$dedupe_out" | sed -n 's/^Backup: //p' | head -n 1)"
 assert_file_exists "vocab_dedupe_backup_exists" "$dedupe_backup"
 
+# --- Regression 9: bench-matrix UX checks are stable. ---
+BENCH_HOME="$TMP_ROOT/home-bench"
+BENCH_BIN="$BENCH_HOME/.local/bin"
+BENCH_CFG="$BENCH_HOME/.config/dictate"
+mkdir -p "$BENCH_BIN" "$BENCH_CFG"
+cp "$ROOT/bin/dictate" "$BENCH_BIN/dictate"
+cp "$ROOT/bin/dictate-lib.sh" "$BENCH_BIN/dictate-lib.sh"
+chmod +x "$BENCH_BIN/dictate" "$BENCH_BIN/dictate-lib.sh"
+
+bench_bad_n_out="$(HOME="$BENCH_HOME" PATH="$BENCH_BIN:/usr/bin:/bin" DICTATE_LIB_PATH= DICTATE_CONFIG_DIR="$BENCH_CFG" DICTATE_CONFIG_FILE="$BENCH_CFG/config.toml" CEREBRAS_API_KEY= dictate bench-matrix nope 2>&1 || true)"
+assert_contains "bench_matrix_invalid_n_usage" "$bench_bad_n_out" "usage: dictate bench-matrix [N] [phrase_file]"
+
+bench_missing_phrase_out="$(HOME="$BENCH_HOME" PATH="$BENCH_BIN:/usr/bin:/bin" DICTATE_LIB_PATH= DICTATE_CONFIG_DIR="$BENCH_CFG" DICTATE_CONFIG_FILE="$BENCH_CFG/config.toml" CEREBRAS_API_KEY= dictate bench-matrix 1 "$TMP_ROOT/no-such-phrases.txt" 2>&1 || true)"
+assert_contains "bench_matrix_missing_phrase_file" "$bench_missing_phrase_out" "phrase file not found:"
+
+bench_matrix_out="$(HOME="$BENCH_HOME" PATH="$BENCH_BIN:/usr/bin:/bin" DICTATE_LIB_PATH= DICTATE_CONFIG_DIR="$BENCH_CFG" DICTATE_CONFIG_FILE="$BENCH_CFG/config.toml" CEREBRAS_API_KEY= dictate bench-matrix 1)"
+assert_contains "bench_matrix_smoke_header" "$bench_matrix_out" "Dictate bench-matrix"
+assert_contains "bench_matrix_smoke_skip_note" "$bench_matrix_out" "postprocess=on combos skipped"
+
 echo "Regression tests passed."
