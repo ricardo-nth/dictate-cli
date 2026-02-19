@@ -53,6 +53,7 @@ DIAGNOSTICS:
   dictate keep-logs          # show persistent log retention setting
   dictate keep-logs on|off   # persist log retention in config
   dictate bench [N]          # summarize recent stage timings (default: 30 runs)
+  dictate bench-matrix [N] [phrase_file] # compare model x postprocess x vocab_clean on fixed phrases
   dictate changelog          # show recent Dictate changes
 
 INTEGRATIONS:
@@ -194,6 +195,8 @@ ENV OPTIONS:
   DICTATE_VAD=1              # whisper-cli voice activity detection (skip silences)
   DICTATE_KEEP_LOGS=1        # keep /tmp logs even on success
   DICTATE_BENCH_MAX_ROWS=800 # cap retained bench samples in history/bench.tsv
+  DICTATE_BENCH_MATRIX_MODE=short # force mode used by bench-matrix cleanup/postprocess
+  DICTATE_BENCH_MATRIX_MODELS=fast,smart,qwen,gpt # LLM list for postprocess-on matrix runs
   CEREBRAS_API_KEY=...       # required for postprocess
 
 CONFIG FILES (~/.config/dictate/):
@@ -1809,6 +1812,265 @@ if latest.get("startup_total_ms", 0) > 0:
         ).format(**latest)
     )
 PYEOF
+}
+
+bench_matrix() {
+  local rounds_arg="${1:-}"
+  local phrase_arg="${2:-}"
+  local rounds="1"
+
+  if [[ -n "$rounds_arg" ]]; then
+    [[ "$rounds_arg" =~ ^[0-9]+$ ]] || die "usage: dictate bench-matrix [N] [phrase_file]"
+    (( rounds_arg > 0 )) || die "usage: dictate bench-matrix [N] [phrase_file]"
+    rounds="$rounds_arg"
+  fi
+
+  local mode="${DICTATE_BENCH_MATRIX_MODE:-short}"
+  mode="$(canonical_mode_name "$mode")"
+  if [[ ! -d "$DICTATE_CONFIG_DIR/modes/$(mode_to_dir_name "$mode")" ]]; then
+    mode="short"
+  fi
+
+  local phrase_src=""
+  local -a phrases=()
+  if [[ -n "$phrase_arg" ]]; then
+    phrase_src="$(expand_path "$phrase_arg")"
+    [[ -f "$phrase_src" ]] || die "phrase file not found: $phrase_src"
+    local line trimmed
+    while IFS= read -r line || [[ -n "$line" ]]; do
+      trimmed="$(printf "%s" "$line" | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//')"
+      [[ -z "$trimmed" ]] && continue
+      [[ "$trimmed" == \#* ]] && continue
+      phrases+=("$trimmed")
+    done <"$phrase_src"
+  else
+    phrase_src="<built-in>"
+    phrases=(
+      "health lag can you check the logs and send an update"
+      "my app is called dot dictation tool and codex should stay capitalized"
+      "colour behaviour and organise should stay in british spelling"
+      "please summarise this in two short paragraphs and keep it concise"
+      "i need a follow up pr for cleanup after this bench matrix run"
+      "switch swiftbar off then on and confirm the plugin state"
+    )
+  fi
+
+  (( ${#phrases[@]} > 0 )) || die "no benchmark phrases found: $phrase_src"
+
+  local models_raw="${DICTATE_BENCH_MATRIX_MODELS:-fast,smart,qwen,gpt}"
+  models_raw="$(printf "%s" "$models_raw" | tr ',' ' ')"
+  local -a llm_models=()
+  local token resolved existing seen
+  for token in $models_raw; do
+    case "$token" in
+      fast|8b) resolved="llama3.1-8b" ;;
+      smart|70b) resolved="llama-3.3-70b" ;;
+      qwen|32b) resolved="qwen-3-32b" ;;
+      gpt|oss) resolved="gpt-oss-120b" ;;
+      *) resolved="$token" ;;
+    esac
+    [[ -n "$resolved" ]] || continue
+    seen="0"
+    if [[ "${#llm_models[@]}" -gt 0 ]]; then
+      for existing in "${llm_models[@]}"; do
+        if [[ "$existing" == "$resolved" ]]; then
+          seen="1"
+          break
+        fi
+      done
+    fi
+    [[ "$seen" == "1" ]] || llm_models+=("$resolved")
+  done
+  if [[ "${#llm_models[@]}" -eq 0 ]]; then
+    llm_models=("${CFG_POSTPROCESS_LLM:-gpt-oss-120b}")
+  fi
+
+  local postprocess_available="0"
+  [[ -n "${CEREBRAS_API_KEY:-}" ]] && postprocess_available="1"
+
+  local total_combos="2"
+  if [[ "$postprocess_available" == "1" ]]; then
+    total_combos=$((2 + ${#llm_models[@]} * 2))
+  fi
+
+  local results_file
+  results_file="$(mktemp "${TMPDIR:-/tmp}/dictate-bench-matrix.XXXXXX")"
+
+  local clean_enabled="${DICTATE_CLEAN:-0}"
+  local repeats_level="${DICTATE_REPEATS_LEVEL:-${CFG_CLEAN_REPEATS_LEVEL:-1}}"
+
+  local combo_idx=0
+  local post_flag vocab_flag iter model phrase txt
+  local model_label total_ms clean_ms post_ms vocab_ms
+  local stage_started_ms flow_started_ms run_repeats
+  local input_norm output_norm changed
+  local -a model_candidates=()
+
+  for post_flag in 0 1; do
+    if [[ "$post_flag" == "1" && "$postprocess_available" != "1" ]]; then
+      continue
+    fi
+
+    if [[ "$post_flag" == "1" ]]; then
+      model_candidates=("${llm_models[@]}")
+    else
+      model_candidates=("-")
+    fi
+
+    for vocab_flag in 0 1; do
+      for model in "${model_candidates[@]}"; do
+        combo_idx=$((combo_idx + 1))
+        echo "bench-matrix: combo $combo_idx/$total_combos (model=$model post=$post_flag vocab=$vocab_flag)"
+
+        for ((iter = 1; iter <= rounds; iter++)); do
+          for phrase in "${phrases[@]}"; do
+            flow_started_ms="$(now_ms)"
+            stage_started_ms="$(now_ms)"
+            txt="$(printf "%s" "$phrase" | sanitize_transcript_artifacts)"
+            if [[ "$clean_enabled" == "1" ]]; then
+              run_repeats="1"
+              if [[ "$post_flag" == "1" ]] && ! bool_is_on "${DICTATE_REPEATS_WITH_POSTPROCESS:-0}"; then
+                run_repeats="0"
+              fi
+              txt="$(printf "%s" "$txt" | clean_fillers)"
+              if [[ "$run_repeats" == "1" && "$repeats_level" != "0" ]]; then
+                txt="$(printf "%s" "$txt" | clean_repeats "$repeats_level")"
+              fi
+            fi
+            clean_ms=$(( $(now_ms) - stage_started_ms ))
+
+            post_ms=0
+            if [[ "$post_flag" == "1" ]]; then
+              stage_started_ms="$(now_ms)"
+              txt="$(DICTATE_FORCE_MODE="$mode" DICTATE_LLM_MODEL="$model" postprocess_llm "$txt" "")"
+              txt="$(printf "%s" "$txt" | auto_paragraphs "$mode")"
+              post_ms=$(( $(now_ms) - stage_started_ms ))
+            fi
+
+            vocab_ms=0
+            if [[ "$vocab_flag" == "1" ]]; then
+              stage_started_ms="$(now_ms)"
+              txt="$(printf "%s" "$txt" | apply_vocab_corrections "$mode")"
+              vocab_ms=$(( $(now_ms) - stage_started_ms ))
+            fi
+
+            txt="$(printf "%s" "$txt" | normalize_british_spelling)"
+            total_ms=$(( $(now_ms) - flow_started_ms ))
+
+            input_norm="$(printf "%s" "$phrase" | sed -E 's/[[:space:]]+/ /g; s/^ //; s/ $//')"
+            output_norm="$(printf "%s" "$txt" | sed -E 's/[[:space:]]+/ /g; s/^ //; s/ $//')"
+            changed="0"
+            [[ "$output_norm" != "$input_norm" ]] && changed="1"
+
+            model_label="$model"
+            [[ "$post_flag" == "0" ]] && model_label="-"
+            printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+              "$model_label" "$post_flag" "$vocab_flag" "$total_ms" "$clean_ms" "$post_ms" "$vocab_ms" "$changed" >>"$results_file"
+          done
+        done
+      done
+    done
+  done
+
+  need python3
+  python3 - "$results_file" "$mode" "$phrase_src" "${#phrases[@]}" "$rounds" "$postprocess_available" <<'PYEOF'
+import collections, statistics, sys
+
+path = sys.argv[1]
+mode = sys.argv[2]
+phrase_src = sys.argv[3]
+phrase_count = int(sys.argv[4])
+rounds = int(sys.argv[5])
+post_available = sys.argv[6] == "1"
+
+rows = []
+with open(path, "r", encoding="utf-8", errors="replace") as fh:
+    for line in fh:
+        parts = line.rstrip("\n").split("\t")
+        if len(parts) < 8:
+            continue
+        model, post, vocab, total_ms, clean_ms, post_ms, vocab_ms, changed = parts[:8]
+
+        def to_int(v):
+            try:
+                return int(v)
+            except Exception:
+                return 0
+
+        rows.append(
+            {
+                "model": model,
+                "post": post,
+                "vocab": vocab,
+                "total_ms": to_int(total_ms),
+                "clean_ms": to_int(clean_ms),
+                "post_ms": to_int(post_ms),
+                "vocab_ms": to_int(vocab_ms),
+                "changed": 1 if changed == "1" else 0,
+            }
+        )
+
+if not rows:
+    print("No bench-matrix samples produced.")
+    raise SystemExit(0)
+
+def percentile(values, pct):
+    if not values:
+        return 0
+    vals = sorted(values)
+    if len(vals) == 1:
+        return vals[0]
+    pos = (len(vals) - 1) * pct
+    lo = int(pos)
+    hi = min(lo + 1, len(vals) - 1)
+    frac = pos - lo
+    return int(round(vals[lo] * (1 - frac) + vals[hi] * frac))
+
+groups = collections.defaultdict(list)
+for row in rows:
+    groups[(row["model"], row["post"], row["vocab"])].append(row)
+
+def sort_key(item):
+    model, post, vocab = item[0]
+    post_val = 1 if post == "1" else 0
+    vocab_val = 1 if vocab == "1" else 0
+    model_val = model if model != "-" else ""
+    return (post_val, model_val, vocab_val)
+
+print("Dictate bench-matrix")
+print(f"Mode: {mode}")
+print(f"Phrases: {phrase_count} (source: {phrase_src})")
+print(f"Rounds: {rounds}")
+print(f"Samples: {len(rows)}")
+if not post_available:
+    print("Note: postprocess=on combos skipped (CEREBRAS_API_KEY not set).")
+print("")
+print("model              post vocab n   changed  total(ms) med/p90/max  clean med  post med  vocab med")
+
+for (model, post, vocab), bucket in sorted(groups.items(), key=sort_key):
+    totals = [r["total_ms"] for r in bucket]
+    cleans = [r["clean_ms"] for r in bucket]
+    posts = [r["post_ms"] for r in bucket if r["post_ms"] > 0]
+    vocabs = [r["vocab_ms"] for r in bucket if r["vocab_ms"] > 0]
+    changed = sum(r["changed"] for r in bucket)
+    n = len(bucket)
+
+    model_label = "(n/a)" if model == "-" else model
+    post_label = "on" if post == "1" else "off"
+    vocab_label = "on" if vocab == "1" else "off"
+    total_cell = f"{int(statistics.median(totals))}/{percentile(totals, 0.90)}/{max(totals)}"
+    clean_med = int(statistics.median(cleans)) if cleans else 0
+    post_med = int(statistics.median(posts)) if posts else 0
+    vocab_med = int(statistics.median(vocabs)) if vocabs else 0
+    changed_cell = f"{changed}/{n}"
+
+    print(
+        f"{model_label:<18} {post_label:<4} {vocab_label:<5} {n:<3} {changed_cell:<8} "
+        f"{total_cell:<20} {clean_med:<9} {post_med:<8} {vocab_med:<9}"
+    )
+PYEOF
+
+  rm -f "$results_file" 2>/dev/null || true
 }
 
 # Save a dictation to history
@@ -5010,6 +5272,7 @@ case "$cmd" in
   doctor) doctor ;;
   logs) logs ;;
   bench) bench "${2:-}" ;;
+  bench-matrix|bench_matrix) bench_matrix "${2:-}" "${3:-}" ;;
   changelog) changelog ;;
   status) status ;;
   stop) stop ;;
